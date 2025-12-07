@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>SmartRoute - Carte + GPX</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+        }
+
+        #map {
+            height: 600px;
+            width: 100%;
+            margin-top: 20px;
+            border: 1px solid #ccc;
+        }
+
+        #userPrompt {
+            padding: 8px;
+            font-size: 1em;
+            width: 60%;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 8px 16px;
+            font-size: 1em;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #27ae60;
+        }
+
+        #status, #stats {
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        .controls {
+            margin-bottom: 10px;
+        }
+
+        #downloadBtn {
+            background-color: #3498db;
+            display: none;
+        }
+
+        #downloadBtn:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚵 SmartRoute – Générateur de parcours VTT</h1>
+
+    <form id="promptForm" class="controls">
+        <label for="userPrompt">Quel type de parcours veux-tu ?</label><br>
+        <input type="text" id="userPrompt" placeholder="Ex : boucle 25 km en forêt autour de Fontainebleau" />
+        <button type="submit">Générer</button>
+        <button type="button" id="clearBtn">Effacer la trace</button>
+        <button type="button" id="downloadBtn">Télécharger la trace GPX</button>
+    </form>
+
+    <p id="status"></p>
+    <p id="stats"></p>
+
+    <hr>
+
+    <label for="gpxFile">Ou charge ton propre fichier GPX :</label>
+    <input type="file" id="gpxFile" accept=".gpx" />
+
+    <div id="map"></div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
+    <script src="https://unpkg.com/leaflet-polylinedecorator@1.7.0/dist/leaflet.polylineDecorator.min.js"></script>
+
+    <script>
+        const map = L.map('map').setView([48.4, 2.7], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let currentLayer = null;
+        let arrowDecorator = null;
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        function clearMap() {
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+                currentLayer = null;
+            }
+            if (arrowDecorator) {
+                map.removeLayer(arrowDecorator);
+                arrowDecorator = null;
+            }
+            document.getElementById('stats').textContent = "";
+            downloadBtn.style.display = "none";
+        }
+
+        function addDirectionArrows(polyline) {
+            const latlngs = polyline.getLayers()[0]?.getLatLngs();
+            if (!latlngs || latlngs.length < 2) return;
+
+            arrowDecorator = L.polylineDecorator(latlngs, {
+                patterns: [{
+                    offset: 10,
+                    repeat: 20,
+                    symbol: L.Symbol.arrowHead({
+                        pixelSize: 18,
+                        pathOptions: {
+                            fillOpacity: 1,
+                            color: "black",
+                            weight: 2
+                        }
+                    })
+                }]
+            }).addTo(map);
+        }
+
+        function formatStats(distance) {
+            const distKm = (distance / 1000).toFixed(1);
+            return `📏 ${distKm} km`;
+        }
+
+        function displayGpxLayer(gpxDataOrUrl, isUrl = false) {
+            clearMap();
+            currentLayer = new L.GPX(gpxDataOrUrl, {
+                async: true,
+                marker_options: {
+                    startIconUrl: null,
+                    endIconUrl: null,
+                    shadowUrl: null
+                }
+            }).on('loaded', function(e) {
+                map.fitBounds(e.target.getBounds());
+
+                setTimeout(() => {
+                    addDirectionArrows(currentLayer);
+                }, 500);
+
+                const dist = e.target.get_distance();
+                if (dist) {
+                    document.getElementById('stats').textContent = formatStats(dist);
+                }
+            }).addTo(map);
+        }
+
+        document.getElementById('gpxFile').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file && file.name.endsWith('.gpx')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    displayGpxLayer(e.target.result, false);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        document.getElementById('promptForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const prompt = document.getElementById('userPrompt').value;
+            const status = document.getElementById('status');
+            status.textContent = "🕐 Génération en cours...";
+            document.getElementById('stats').textContent = "";
+            downloadBtn.style.display = "none";
+
+            fetch('/generate-route', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt })
+            })
+            .then(res => res.json())
+            .then(data => {
+                const url = data.map_url;
+                if (url.endsWith('.gpx')) {
+                    displayGpxLayer(url, true);
+                    status.textContent = "✅ Itinéraire affiché sur la carte !";
+
+                    // Active le bouton de téléchargement
+                    downloadBtn.style.display = "inline-block";
+                    downloadBtn.onclick = () => {
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = "smartRoute.gpx";
+                        link.click();
+                    };
+                } else {
+                    status.innerHTML = `✅ <a href="${url}" target="_blank">Voir la trace générée</a>`;
+                }
+            })
+            .catch(error => {
+                status.textContent = "❌ Une erreur est survenue.";
+                console.error(error);
+            });
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', clearMap);
+    </script>
+</body>
+</html>

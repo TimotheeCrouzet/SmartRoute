@@ -1,0 +1,13 @@
+# Traiter tous les fichiers texte en UTF-8
+* text=auto eol=lf
+
+# Forcer certains types de fichiers en texte
+*.py text
+*.ipynb text
+*.md text
+*.txt text
+
+# Traiter les images comme binaires
+*.png binary
+*.jpg binary
+*.jpeg binary

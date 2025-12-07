@@ -1,0 +1,17 @@
+# Noyau de calcul
+numpy==2.2.3
+pandas==2.2.3
+scipy==1.15.2
+
+# Visualisation
+matplotlib==3.10.1
+seaborn==0.13.2
+
+# Dev / IPython
+ipython==9.0.1
+ipykernel==6.29.5
+jupyter_client==8.6.3
+jupyter_core==5.7.2
+matplotlib-inline==0.1.7
+traitlets==5.14.3
+
