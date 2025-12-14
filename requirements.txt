@@ -1,17 +1,12 @@
-# Noyau de calcul
-numpy==2.2.3
-pandas==2.2.3
-scipy==1.15.2
+numpy>=2.2,<3
+pandas>=2.2,<3
+scipy>=1.15,<2
 
-# Visualisation
-matplotlib==3.10.1
-seaborn==0.13.2
+matplotlib>=3.10,<4
+seaborn>=0.13,<0.14
 
-# Dev / IPython
-ipython==9.0.1
-ipykernel==6.29.5
-jupyter_client==8.6.3
-jupyter_core==5.7.2
-matplotlib-inline==0.1.7
-traitlets==5.14.3
-
+flask>=3,<4
+pyyaml>=6,<7
+requests>=2.31,<3
+networkx>=3.2,<4
+anthropic>=0.40,<1
