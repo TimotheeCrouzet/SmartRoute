@@ -50,11 +50,13 @@ def spatial_ratio(path, G):
 def node_diversity(path):
     return len(set(path)) / len(path) if path else 0
 
-def total_distance(G, path):
-    return sum(
-        haversine(G.nodes[a]["y"], G.nodes[a]["x"], G.nodes[b]["y"], G.nodes[b]["x"])
-        for a, b in zip(path[:-1], path[1:])
-    )
+def total_distance(G, path, cost_attr):
+    distance = 0
+    for a, b in zip(path[:-1], path[1:]):
+        edges = G[a][b]
+        edge = min(edges.values(), key=lambda data: data[cost_attr]) if G.is_multigraph() else edges
+        distance += edge["length"]
+    return distance
 
 def generate_forced_loop(G, start, lat_start, lon_start, target_dist, profil, angle):
     profil = {"débutant": "debutant", "confirmé": "confirme"}.get(profil, profil)
@@ -153,7 +155,7 @@ def generate_from_prompt(prompt: str) -> dict:
         loop = generate_forced_loop(G, start_node, lat, lon, distance_cible, profil, angle)
         if loop:
             full_path = loop[0] + loop[1][1:]
-            distance = total_distance(G, full_path)
+            distance = total_distance(G, full_path, f"cost_{profil.replace('é', 'e')}")
 
             if not (0.7 * distance_cible <= distance <= 1.3 * distance_cible):
                 continue
