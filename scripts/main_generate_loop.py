@@ -60,13 +60,23 @@ def node_diversity(path):
     return len(set(path)) / len(path) if path else 0
 
 def generate_forced_loop(G, start, lat_start, lon_start, target_dist, profil, angle):
+    profil = {"débutant": "debutant", "confirmé": "confirme"}.get(profil, profil)
+    if profil not in {"debutant", "confirme", "expert"}:
+        raise ValueError(f"Profil inconnu : {profil!r}")
     attr = f"cost_{profil}"
+
+    def edge_weight(u, v, data):
+        edges = data.values() if G.is_multigraph() else (data,)
+        if any(attr not in edge for edge in edges):
+            raise ValueError(f"Attribut de coût absent du graphe : {attr}")
+        return min(edge[attr] for edge in edges)
+
     radius = target_dist / 3
     lat_wp, lon_wp = compute_waypoint(lat_start, lon_start, radius, angle)
     waypoint = find_nearest_node(G, lat_wp, lon_wp)
 
     try:
-        _, path_out = nx.single_source_dijkstra(G, start, waypoint, weight=attr, cutoff=radius * 1.5)
+        _, path_out = nx.single_source_dijkstra(G, start, waypoint, weight=edge_weight, cutoff=radius * 1.5)
     except nx.NetworkXNoPath:
         return None
 
@@ -83,7 +93,7 @@ def generate_forced_loop(G, start, lat_start, lon_start, target_dist, profil, an
                 G.remove_edge(u, v)
             edges_removed.append(edge)
 
-        _, path_back = nx.single_source_dijkstra(G, waypoint, start, weight=attr, cutoff=radius * 1.5)
+        _, path_back = nx.single_source_dijkstra(G, waypoint, start, weight=edge_weight, cutoff=radius * 1.5)
         return path_out, path_back
     except nx.NetworkXNoPath:
         return None
