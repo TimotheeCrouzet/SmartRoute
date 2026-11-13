@@ -71,16 +71,24 @@ def generate_forced_loop(G, start, lat_start, lon_start, target_dist, profil, an
         return None
 
     edges_out = [(path_out[i], path_out[i+1]) for i in range(len(path_out)-1)]
-    G.remove_edges_from(edges_out)
-
+    edges_removed = []
     try:
-        _, path_back = nx.single_source_dijkstra(G, waypoint, start, weight=attr, cutoff=radius * 1.5)
-    except nx.NetworkXNoPath:
-        G.add_edges_from(edges_out)
-        return None
+        for u, v in edges_out:
+            if G.is_multigraph():
+                key = list(G[u][v])[-1]
+                edge = (u, v, key, G[u][v][key].copy())
+                G.remove_edge(u, v, key)
+            else:
+                edge = (u, v, G[u][v].copy())
+                G.remove_edge(u, v)
+            edges_removed.append(edge)
 
-    G.add_edges_from(edges_out)
-    return path_out, path_back
+        _, path_back = nx.single_source_dijkstra(G, waypoint, start, weight=attr, cutoff=radius * 1.5)
+        return path_out, path_back
+    except nx.NetworkXNoPath:
+        return None
+    finally:
+        G.add_edges_from(edges_removed)
 
 def save_loop_as_gpx(G, path_tuple, filename="route_manual.gpx"):
     if not path_tuple:
